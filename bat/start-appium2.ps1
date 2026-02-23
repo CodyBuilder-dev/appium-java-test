@@ -192,9 +192,11 @@ function Ensure-AndroidEnv {
     $env:ANDROID_SDK_ROOT = $sdk
 
     # JAVA_HOME: Android Studio 번들 JBR가 있으면 사용 (없으면 그냥 안 건드림)
+    # JAVA_HOME으로 사용할 JDK를 명시해주지 않으면 버전 불일치로 인한 에러 발생 가능
     $jbrCandidates = @(
         "$env:ProgramFiles\Android\Android Studio\jbr",
-        "$env:ProgramFiles\Android\Android Studio\jre"
+        "$env:ProgramFiles\Android\Android Studio\jre",
+        "$env:USERPROFILE\.jdks\corretto-21.0.10" # 자신이 설치한 jdk 폴더로 지정.
     )
     foreach ($j in $jbrCandidates) {
         if (Test-Path $j) {
