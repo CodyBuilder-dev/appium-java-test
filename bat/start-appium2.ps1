@@ -26,9 +26,44 @@ function Refresh-EnvFromRegistry {
 
     $env:NVM_SYMLINK = [Environment]::GetEnvironmentVariable("NVM_SYMLINK", "Machine")
     if (-not $env:NVM_SYMLINK) { $env:NVM_SYMLINK = [Environment]::GetEnvironmentVariable("NVM_SYMLINK", "User") }
+
+    # 일반적인 nvm 설치 경로도 확인
+    $commonNvmPaths = @(
+        "$env:APPDATA\nvm",
+        "$env:ProgramFiles\nvm"
+    )
+    foreach ($nvmPath in $commonNvmPaths) {
+        if ((Test-Path $nvmPath) -and -not $env:NVM_HOME) {
+            $env:NVM_HOME = $nvmPath
+        }
+    }
+
+    # NVM_HOME을 PATH에 추가 (nvm 명령어를 위해)
+    if ($env:NVM_HOME -and (Test-Path $env:NVM_HOME)) {
+        if ($env:Path -notmatch [regex]::Escape($env:NVM_HOME)) {
+            $env:Path = "$env:NVM_HOME;$env:Path"
+        }
+    }
+
+    # NVM_SYMLINK를 PATH에 추가 (node/npm 명령어를 위해)
+    if (-not $env:NVM_SYMLINK -and $env:NVM_HOME) {
+        $symlinkPath = Join-Path (Split-Path $env:NVM_HOME -Parent) "nodejs"
+        if (Test-Path $symlinkPath) {
+            $env:NVM_SYMLINK = $symlinkPath
+        }
+    }
+
+    if ($env:NVM_SYMLINK -and (Test-Path $env:NVM_SYMLINK)) {
+        if ($env:Path -notmatch [regex]::Escape($env:NVM_SYMLINK)) {
+            $env:Path = "$env:NVM_SYMLINK;$env:Path"
+        }
+    }
 }
 
 function Ensure-Nvm {
+    # 먼저 환경 변수를 새로고침해서 nvm 경로 확인
+    Refresh-EnvFromRegistry
+
     if (Has-Command "nvm") {
         Write-Ok "nvm already installed: $(nvm version)"
         return
@@ -69,6 +104,9 @@ function Ensure-Nvm {
 function Ensure-NodeLts {
     Write-Step "Ensuring Node/NPM"
 
+    # PATH 새로고침 (NVM_SYMLINK 포함)
+    Refresh-EnvFromRegistry
+
     if (Has-Command "node" -and Has-Command "npm") {
         try {
             Write-Ok "node already available: $(node -v)"
@@ -81,6 +119,9 @@ function Ensure-NodeLts {
     Write-Host "node/npm not found → nvm install/use lts"
     nvm install lts
     nvm use lts
+
+    # node/npm PATH 반영을 위해 다시 새로고침
+    Refresh-EnvFromRegistry
 
     if (-not (Has-Command "node") -or -not (Has-Command "npm")) {
         throw "node/npm still not found after nvm use lts. Check NVM_SYMLINK is in PATH."
